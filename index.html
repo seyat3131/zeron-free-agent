@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZERON FREE AGENT - Oyuncu İhtiyacı Sistemi</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Özel Tema Stilleri */
+        :root {
+            --bg-dark: #1a1a2e; /* Koyu Lacivert (Arka Plan) */
+            --primary-red: #e94560; /* Kırmızı */
+            --accent-light: #f1f1f1; /* Yazı Rengi (Genel Tema): Açık Gri/Beyaz */
+            --card-dark: #24243e; /* Koyu Gri/Mor (Slot Kartları) */
+            --card-active: #3f3f6e;
+            --modal-bg-light: #ffffff; /* Modal Arka Planı: Beyaz */
+            --text-dark: #1f2937; /* Modal Yazı Rengi: Koyu Gri/Siyah */
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--accent-light); /* Genel yazı rengi açık */
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Başlık Stili */
+        #title {
+            text-shadow: 0 0 10px var(--primary-red);
+        }
+
+        /* Rezervasyon Kutucukları (Slots) */
+        .slot-card {
+            background-color: var(--card-dark);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid var(--primary-red);
+            min-height: 180px; 
+            height: auto; 
+            position: relative; 
+        }
+
+        .slot-card.reserved {
+            cursor: default;
+        }
+
+        .slot-card.clickable:hover {
+            background-color: var(--card-active);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.3);
+        }
+        
+        /* Düğmeler */
+        #save-button, .modal-button {
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .modal-button:hover {
+            transform: translateY(-1px);
+        }
+
+        /* Modal (Popup) Arka Planı */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            overflow-y: auto; 
+        }
+        
+        /* Liste İkonu Rengi (Kural Kutucuğu) */
+        .rule-list li::before {
+            content: "•";
+            color: var(--primary-red);
+            font-weight: bold;
+            display: inline-block; 
+            width: 1em;
+            margin-left: -1em;
+        }
+        
+        /* MODAL İÇİ ÖZEL STİLLER */
+        .modal-content-area {
+            background-color: var(--modal-bg-light); 
+            color: var(--text-dark); 
+            max-height: 90vh; 
+            display: flex; 
+            flex-direction: column;
+        }
+
+        /* Sadece Formun Kaydırılabilir Alanı */
+        .modal-scroll-area {
+            overflow-y: auto;
+            flex-grow: 1; 
+            padding-bottom: 0.5rem; 
+        }
+        
+        /* Modal Input Alanları */
+        .modal-input {
+            background-color: #f3f4f6; 
+            color: var(--text-dark); 
+            border: 1px solid #d1d5db;
+        }
+        .modal-input:focus {
+            border-color: var(--primary-red);
+            box-shadow: 0 0 0 1px var(--primary-red);
+        }
+        
+        /* İptal Butonu Stili (Kartın Dışında, Üstte) */
+        .cancel-button {
+            display: flex; 
+            align-items: center;
+            justify-content: center;
+            width: fit-content; 
+            margin: 0 auto 8px auto; 
+            
+            background-color: var(--primary-red);
+            color: white;
+            font-size: 0.8rem; 
+            font-weight: bold;
+            padding: 6px 12px; 
+            border-radius: 9999px; 
+            cursor: pointer;
+            transition: background-color 0.15s, transform 0.15s, box-shadow 0.15s;
+            
+            gap: 6px;
+            z-index: 10;
+            border: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            white-space: nowrap; /* Tıklama alanının bozulmasını önle */
+        }
+        .cancel-button:hover {
+            background-color: #ff6384; 
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+        }
+        
+    </style>
+</head>
+<body class="selection:bg-red-500 selection:text-white">
+
+    <!-- Üst Başlık ve Saat Alanı -->
+    <header class="bg-black/20 p-4 flex flex-col sm:flex-row justify-between items-center border-b-2 border-primary-red shadow-lg">
+        <div id="title" class="text-3xl sm:text-4xl font-extrabold text-white tracking-wider mb-2 sm:mb-0">
+            ZERON ORGANİZASYON
+        </div>
+        <div id="datetime" class="text-sm sm:text-lg font-medium text-gray-300 text-center sm:text-right">
+            <!-- Canlı Saat Buraya Gelecek -->
+        </div>
+    </header>
+
+    <!-- Ana İçerik -->
+    <main class="flex-grow p-4 sm:p-8">
+        <h1 class="text-2xl sm:text-3xl font-bold text-center mt-6 mb-8 text-primary-red tracking-wide">
+            OYUNCUYA İHTİYACI OLAN TAKIMLAR
+        </h1>
+        
+        <!-- Bilgilendirme Kutucuğu -->
+        <div class="max-w-6xl mx-auto p-4 mb-8 bg-card-dark rounded-xl border border-primary-red shadow-lg">
+            <h2 class="text-xl font-bold mb-2 text-primary-red">REZERVASYON KURALLARI VE BİLGİLENDİRME</h2>
+            <ul class="text-sm space-y-1 rule-list ml-4">
+                <li><span class="text-gray-300">Rezervasyonlar Realtime Database ile kalıcı olarak kaydedilir ve **canlı olarak** herkes tarafından görülür.</span></li>
+                <li><span class="text-gray-300">Herkes sadece günde **bir kez** rezervasyon yapabilir (Limit tarayıcı bazlıdır).</span></li>
+                <li><span class="text-gray-300">Boş kutucuğa tıklayarak rezervasyon yapabilirsiniz. Rezerve kutucuklar tıklanamaz.</span></li>
+            </ul>
+        </div>
+
+        <!-- Rezervasyon Kutucukları (Grid) -->
+        <!-- Sitenin yüklenmesini beklememek için burası başlangıçta boş slotlarla doldurulacak. -->
+        <div id="slots-container" class="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <!-- Kutucuklar JavaScript ile doldurulacak -->
+        </div>
+    </main>
+    
+    <!-- YÖNETİCİ PANELİ KONTEYNERİ (Yine Sadece Admin Aktifse Görünür) -->
+    <div id="admin-panel-container" class="w-full flex justify-center p-4" style="display: none;">
+        <div id="admin-panel" class="bg-card-active p-4 rounded-lg border border-primary-red shadow-xl w-full max-w-xl text-center">
+            <h3 class="text-xl font-bold text-primary-red mb-2">⚙️ YÖNETİCİ MODU AKTİF</h3>
+            <p class="text-sm mb-0">Rezerve slotların üzerindeki **"SLOTU İPTAL ET"** tuşunu kullanarak rezervasyonu anında silebilirsiniz. (Kalıcı yetki aktif.)</p>
+        </div>
+    </div>
+    
+    <!-- Alt Bilgi (Footer) -->
+    <footer class="bg-black/20 text-center p-4 border-t-2 border-primary-red mt-auto">
+        <p class="text-sm font-light">
+            Scrim maçlarımıza katılmak için: 
+            <a href="https://www.instagram.com/channel/AbZQkLlACS31g8OC/" target="_blank" class="text-primary-red hover:underline font-semibold">
+                https://www.instagram.com/channel/AbZQkLlACS31g8OC/
+            </a>
+        </p>
+    </footer>
+
+
+    <!-- Rezervasyon Formu MODAL (Popup) -->
+    <div id="reservation-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <!-- Burası Modal İçeriği -->
+        <div class="modal-content-area p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md border-2 border-primary-red">
+            <!-- 1. Modal Başlığı (Sabit) -->
+            <h2 id="modal-title" class="text-2xl font-bold mb-4 text-primary-red border-b pb-2 border-gray-300">SLOT #X REZERVASYON</h2>
+            
+            <form id="reservation-form" class="flex flex-col flex-grow">
+                <!-- 2. Modal Formunun Kaydırılabilir Alanı -->
+                <div class="modal-scroll-area space-y-4 mb-4"> 
+                    <div class="mb-4">
+                        <label for="team-name" class="block text-sm font-medium mb-1">Takım Adı</label>
+                        <input type="text" id="team-name" required maxlength="50"
+                               class="modal-input w-full p-2 rounded focus:ring-primary-red focus:border-primary-red">
+                    </div>
+                    <div class="mb-4">
+                        <label for="insta-name" class="block text-sm font-medium mb-1">Instagram Kullanıcı Adı (Örn: @zeronorg)</label>
+                        <input type="text" id="insta-name" required maxlength="30"
+                               class="modal-input w-full p-2 rounded focus:ring-primary-red focus:border-primary-red">
+                    </div>
+                    <div>
+                        <label for="description" class="block text-sm font-medium mb-1">Açıklama (Karakter sınırı yok)</label>
+                        <textarea id="description" rows="4"
+                                  class="modal-input w-full p-2 rounded focus:ring-primary-red focus:border-primary-red"
+                                  style="resize: vertical;"></textarea>
+                    </div>
+                </div>
+
+                <!-- 3. Modal Butonları (Sabit) -->
+                <div class="flex justify-between space-x-4 pt-2 border-t border-gray-300 flex-shrink-0">
+                    <!-- İptal Butonu -->
+                    <button type="button" id="close-modal" class="modal-button bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex-1 text-center">
+                        İptal
+                    </button>
+                    <!-- REZERVE ET Butonu -->
+                    <button type="submit" id="reserve-submit-button" class="modal-button bg-primary-red hover:bg-red-700 text-black font-bold py-2 px-4 rounded-lg flex-1 text-center">
+                        REZERVE ET
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JavaScript ve Firebase Entegrasyonu -->
+    <script type="module">
+        // Firebase Modüllerini İçe Aktar
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-firestore.js";
+        import { getDatabase, ref, onValue, set, get } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-database.js";
+        
+        // --- Sabitlerin Güvenli Tanımlanması ---
+        
+        const appIdRaw = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        
+        let firebaseConfig = {};
+        try {
+            firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        } catch (e) {
+            console.error("Firebase Config parse hatası:", e);
+        }
+
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        function sanitizePath(path) {
+            // Realtime DB yollarında geçersiz olan karakterleri ('., #, $, [, ]') alt çizgi ile değiştirir.
+            return path.replace(/[.#$\[\]]/g, '_');
+        }
+
+        const appId = sanitizePath(appIdRaw); 
+        
+        // Firebase Servislerini Başlat
+        let app, database, auth, db;
+        
+        // --- Sabitler ---
+        const SLOT_COUNT = 10;
+        const ADMIN_CLICK_THRESHOLD = 30; // Gizli Tıklama Sayısı
+        const LAST_RESERVED_KEY = 'zeron_last_reserved_date'; 
+
+        // Realtime DB ve Firestore Yolları
+        const SLOTS_DB_PATH = `/artifacts/${appId}/public/data/slots`; 
+        const ADMIN_STATUS_COLLECTION_PATH = `/artifacts/${appIdRaw}/public/data/admin_settings`;
+        
+        let slotsRef = null;
+        
+        // --- Elementler ---
+        const datetimeElement = document.getElementById('datetime');
+        const slotsContainer = document.getElementById('slots-container');
+        const modal = document.getElementById('reservation-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const form = document.getElementById('reservation-form');
+        const closeModalButton = document.getElementById('close-modal');
+        const adminPanelContainer = document.getElementById('admin-panel-container'); 
+        const reserveSubmitButton = document.getElementById('reserve-submit-button');
+
+        let clickCount = 0;
+        let selectedSlotId = null;
+        let currentSlotsData = [];
+        let userId = null;
+        let isAuthReady = false;
+        let isAdmin = false; 
+
+        // Firebase başlatma fonksiyonu 
+        function initializeFirebase() {
+            try {
+                if (!Object.keys(firebaseConfig).length) {
+                    // Firebase konfigürasyonu yoksa, sadece varsayılan slotları gösterip çık.
+                    console.error("Firebase konfigürasyonu bulunamadı veya boş.");
+                    currentSlotsData = Object.values(generateInitialSlots());
+                    renderSlots(currentSlotsData);
+                    return;
+                }
+                
+                app = initializeApp(firebaseConfig);
+                database = getDatabase(app); 
+                auth = getAuth(app); 
+                db = getFirestore(app); 
+                
+                slotsRef = ref(database, SLOTS_DB_PATH);
+                console.log("Firebase ve Realtime DB referansları başlatıldı. RTDB Yolu:", SLOTS_DB_PATH);
+                
+                // Auth sürecini başlat
+                setupAuth();
+            } catch (e) {
+                console.error("Kritik Hata: Firebase başlatılırken sorun oluştu:", e);
+                // Hata durumunda sadece varsayılan slotları göster
+                currentSlotsData = Object.values(generateInitialSlots());
+                renderSlots(currentSlotsData);
+            }
+        }
+        
+        function generateInitialSlots() {
+            const slots = {};
+            for (let i = 1; i <= SLOT_COUNT; i++) {
+                slots[`slot${i}`] = {
+                    id: `slot${i}`,
+                    name: `SLOT ${i}`,
+                    teamName: '',
+                    instaName: '',
+                    description: '',
+                    isReserved: false,
+                    reservedAt: null,
+                    reservedByUserId: null
+                };
+            }
+            return slots;
+        }
+
+        // Başlangıçta varsayılan slotları hemen ekranda göster
+        currentSlotsData = Object.values(generateInitialSlots());
+        renderSlots(currentSlotsData); 
+        
+        initializeFirebase(); // Firebase'i başlat ve Auth sürecini tetikle
+
+
+        // --- AUTH & FIRESTORE YÖNETİMİ ---
+
+        async function setupAuth() {
+            if (!auth) return; 
+
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Firebase Authentication hatası:", error);
+            }
+        }
+        
+        // Hata mesajını sadece konsola yazdıran fonksiyon (Ekranı Kirletmez)
+        function consoleError(message) {
+            console.error(message);
+        }
+
+        async function startDataListeners() {
+            if (!isAuthReady || !slotsRef) {
+                console.log("Veri dinleyici başlatılamadı: Auth hazır değil veya DB referansı oluşturulamadı.");
+                return;
+            }
+            
+            const initialData = generateInitialSlots();
+            
+            // Realtime DB'ye ilk başlangıç verisi yazma kontrolü 
+            try {
+                 const snapshot = await get(slotsRef);
+                 if (!snapshot.exists()) {
+                     console.log("Realtime DB boş. Başlangıç verisi yazılıyor.");
+                     await set(slotsRef, initialData); 
+                 }
+            } catch (e) {
+                // Realtime DB yazma hatası sadece konsola loglanır.
+                consoleError(`[RTDB_ERROR] Başlangıç verisi kontrol/yazma hatası: ${e.message}\nLütfen Realtime Database güvenlik kurallarını kontrol edin.`);
+                console.log(`[RTDB_RULES_HINT] Gerekli RTDB kuralı (read/write true olmalı):\n{\n  "rules": {\n    "artifacts": {\n      "$appId": {\n        "public": {\n          "data": {\n            "slots": {\n              ".read": "true",\n              ".write": "true"\n            }\n          }\n        }\n      }\n    }\n  }\n}`);
+            }
+
+            
+            // Realtime DB'den Slot verilerini canlı dinleme (onValue)
+            onValue(slotsRef, (snapshot) => {
+                
+                const firebaseData = snapshot.val();
+                
+                let rawData;
+                if (!firebaseData || Object.keys(firebaseData).length === 0) {
+                     rawData = Object.values(initialData); 
+                } else {
+                    rawData = Object.values(firebaseData);
+                }
+                
+                // Slotları sayı sırasına göre sırala
+                currentSlotsData = rawData.sort((a, b) => {
+                    const numA = getSlotNumber(a.id);
+                    const numB = getSlotNumber(b.id);
+                    return numA - numB;
+                });
+                
+                renderSlots(currentSlotsData); 
+                
+            }, (error) => {
+                consoleError(`[RTDB_ERROR] Firebase'den veri okuma hatası: ${error.message}\nLütfen Realtime DB güvenlik kurallarını kontrol edin.`);
+                // Hata durumunda, başlangıçta zaten render edilmiş olan currentSlotsData (varsayılan slotlar) ekranda kalmaya devam eder.
+            });
+        }
+
+
+        // Firestore'dan Admin durumunu kontrol eden fonksiyon
+        async function checkAdminStatusFromFirestore() {
+            if (!isAuthReady || !userId || !db) {
+                isAdmin = false;
+                adminPanelContainer.style.display = 'none';
+                return;
+            }
+
+            try {
+                const adminDocRef = doc(db, ADMIN_STATUS_COLLECTION_PATH, userId);
+                const docSnap = await getDoc(adminDocRef);
+
+                isAdmin = docSnap.exists() && docSnap.data().isAdmin === true;
+                
+                // UI Güncelleme
+                adminPanelContainer.style.display = isAdmin ? 'flex' : 'none';
+                document.body.classList.toggle('admin-active', isAdmin);
+                
+                // Admin kontrolü bittiğinde slotları tekrar render et (Admin butonları için)
+                renderSlots(currentSlotsData); 
+
+            } catch (e) {
+                // Hata sadece konsola yazılır.
+                consoleError(`[FIRESTORE_ERROR] Admin status kontrolünde hata: ${e.message}`);
+                if (e.message && e.message.includes('permission')) {
+                     console.log(`[FIRESTORE_RULES_HINT] Gerekli Firestore kuralı:\nmatch /artifacts/{appId}/public/data/admin_settings/{docId} {\n  allow read, write: if request.auth != null && request.auth.uid == docId;\n}`);
+                }
+                isAdmin = false; 
+                adminPanelContainer.style.display = 'none';
+                document.body.classList.remove('admin-active');
+                renderSlots(currentSlotsData); 
+            }
+        }
+
+        // Admin Modunu kalıcı olarak etkinleştiren fonksiyon (Gizli tıklama ile tetiklenir)
+        async function enableAdminMode() {
+            if (!isAuthReady || !userId || isAdmin || !db) return;
+
+            // 1. Durumu Firestore'a kaydet (Kalıcı Yetki)
+            try {
+                const adminDocRef = doc(db, ADMIN_STATUS_COLLECTION_PATH, userId);
+                await setDoc(adminDocRef, { isAdmin: true, activatedAt: Date.now() }, { merge: true });
+                
+                // Başarılı kayıttan sonra durumu güncelle
+                isAdmin = true; 
+
+                // 2. UI'ı güncelle
+                adminPanelContainer.style.display = 'flex';
+                document.body.classList.add('admin-active');
+                renderSlots(currentSlotsData); 
+
+                console.log("✅ Yönetici Modu Başarıyla Aktif Edildi ve kalıcı olarak kaydedildi!");
+
+            } catch (error) {
+                // Hata sadece konsola yazılır.
+                consoleError(`[FIRESTORE_ERROR] Admin yetkisi Firestore'a kaydedilirken hata oluştu: ${error.message}`);
+                if (error.message && error.message.includes('permission')) {
+                    console.log(`[FIRESTORE_RULES_HINT] Gerekli Firestore kuralı:\nmatch /artifacts/{appId}/public/data/admin_settings/{docId} {\n  allow read, write: if request.auth != null && request.auth.uid == docId;\n}`);
+                }
+                isAdmin = false; // Hata oluşursa yetkiyi geri al
+                renderSlots(currentSlotsData);
+            }
+        }
+
+        // Auth durumu değiştiğinde tetiklenir
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+            } else {
+                // Eğer oturum açılamazsa anonim bir ID kullan
+                userId = crypto.randomUUID(); 
+            }
+            isAuthReady = true;
+            console.log("Kullanıcı ID:", userId, "Auth Hazır:", isAuthReady);
+            
+            checkAdminStatusFromFirestore(); // Admin yetkisini kontrol et
+            startDataListeners(); // Veri dinlemeyi başlat
+
+        });
+
+        // Admin Modu Gizli Tıklama Dinleyicisi
+        function handleBodyClick(event) {
+            // Eğer Admin modu zaten aktifse daha fazla tıklama sayma.
+            if (isAdmin) {
+                clickCount = 0; 
+                return;
+            }
+            
+            // Eğer tıklama bir rezervasyon kartının içindeki buton değilse veya form değilse sayacı artır
+            const target = event.target;
+            const isInsideSlotCard = target.closest('.slot-card');
+            const isInsideModal = target.closest('#reservation-modal');
+            
+            // Sadece boş alana tıklamaları say
+            if (!isInsideSlotCard && !isInsideModal && !target.closest('#admin-panel-container') && target.tagName !== 'A') {
+                clickCount++;
+                // console.log(`Gizli Tıklama Sayısı: ${clickCount}`); // Bu satır gizli olduğu için yorumda kalabilir
+            }
+
+            if (clickCount >= ADMIN_CLICK_THRESHOLD) {
+                // Sadece Firebase başlatılmışsa yetkiyi aktif etmeye çalış
+                if (app) enableAdminMode();
+                clickCount = 0; // Admin aktif edildiği için sayacı sıfırla
+            }
+        }
+        document.body.addEventListener('click', handleBodyClick);
+
+        // --- YARDIMCI VE REALTIME DB FONKSİYONLARI ---
+
+        function isToday(timestamp) {
+            if (!timestamp) return false;
+            const reservedDate = new Date(parseInt(timestamp)); 
+            const today = new Date();
+            return reservedDate.getDate() === today.getDate() &&
+                   reservedDate.getMonth() === today.getMonth() &&
+                   reservedDate.getFullYear() === today.getFullYear();
+        }
+
+        function getSlotNumber(slotId) {
+            const match = slotId.match(/\d+/);
+            return match ? parseInt(match[0], 10) : 0;
+        }
+
+        function updateDateTime() {
+            const now = new Date();
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            const trTime = new Date(utc + (3600000 * 3)); 
+
+            const dayOptions = { weekday: 'long' };
+            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+            const dateOptions = { day: '2-digit', month: '2-digit', year: 'numeric' };
+            
+            const dayText = trTime.toLocaleString('tr-TR', dayOptions);
+            const timeText = trTime.toLocaleString('tr-TR', timeOptions);
+            const dateText = trTime.toLocaleString('tr-TR', dateOptions);
+
+            datetimeElement.innerHTML = `${dateText} (${dayText}) <br/> ${timeText} TSi`;
+        }
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+
+        // TEK BİR REZERVASYONU SİLME FONKSİYONU (ADMIN İŞLEMİ)
+        function deleteReservation(slotId) {
+            if (!isAdmin || !slotsRef) {
+                console.warn("Rezervasyon silinemedi: Admin yetkisi yok veya DB hazır değil.");
+                return;
+            }
+            
+            const slot = currentSlotsData.find(s => s.id === slotId);
+            
+            if (slot && slot.isReserved) {
+                
+                // Slot verisini temiz bir obje ile değiştir
+                const emptySlot = {
+                    id: slotId,
+                    name: slot.name,
+                    teamName: '',
+                    instaName: '',
+                    description: '',
+                    isReserved: false, 
+                    reservedAt: null,
+                    reservedByUserId: null
+                };
+
+                const slotToUpdateRef = ref(database, `${SLOTS_DB_PATH}/${slotId}`);
+                set(slotToUpdateRef, emptySlot)
+                    .then(() => {
+                        console.log(`✅ ${slotId} rezervasyonu başarıyla silindi ve kullanıma açıldı.`);
+                        if (slot.reservedByUserId === userId) {
+                            localStorage.removeItem(LAST_RESERVED_KEY);
+                        }
+                    })
+                    .catch((error) => {
+                        // Hata sadece konsola yazılır.
+                        consoleError(`[RTDB_ERROR] Silme işlemi sırasında bir hata oluştu: ${error.message}\nLütfen Realtime Database güvenlik kurallarını kontrol edin.`);
+                        console.log(`[RTDB_RULES_HINT] Gerekli RTDB kuralı (admin/yazma true olmalı):\n{\n  "rules": {\n    "artifacts": {\n      "$appId": {\n        "public": {\n          "data": {\n            "slots": {\n              ".read": "true",\n              ".write": "true"\n            }\n          }\n        }\n      }\n    }\n  }\n}`);
+                    });
+            }
+        }
+
+        function renderSlots(slots) {
+            // Sadece veri gerçekten değiştiyse veya ilk render ise (ya da admin durumu değiştiyse) DOM'u güncelle
+            
+            // Eğer slotsContainer'ın içinde eleman yoksa veya isAdmin değiştiyse render et
+            const shouldRender = slotsContainer.children.length === 0 || 
+                                currentSlotsData.length !== slots.length || 
+                                document.body.classList.contains('admin-active') !== isAdmin;
+                                
+            if (!shouldRender && currentSlotsData.length > 0) {
+                 // Sadece veri içeriği değiştiyse (daha derin bir kontrol gerekebilir, şimdilik basit tutalım)
+                 return;
+            }
+
+            slotsContainer.innerHTML = '';
+            
+            const displayData = slots.length > 0 ? slots : Object.values(generateInitialSlots());
+            const limitReached = isToday(localStorage.getItem(LAST_RESERVED_KEY));
+
+            displayData.forEach((slot) => {
+                const isReserved = slot.isReserved;
+                
+                // --- 1. Sarıcı (Wrapper) Elementi ---
+                const wrapperDiv = document.createElement('div');
+                wrapperDiv.className = `flex flex-col ${slot.id}-wrapper`; 
+                
+                // --- 2. Slot Kartı İçin Buton Ekleme (Kartın Üstüne, Sadece Admin'e Görünür) ---
+                if (isReserved && isAdmin) {
+                     const button = document.createElement('button');
+                     button.className = 'cancel-button'; 
+                     button.setAttribute('data-slot-id', slot.id);
+                     button.innerHTML = `
+                        SLOTU İPTAL ET
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>`;
+                        
+                    button.addEventListener('click', (e) => {
+                        e.stopPropagation(); 
+                        deleteReservation(slot.id);
+                    });
+                    
+                    wrapperDiv.appendChild(button); 
+                }
+
+                // --- 3. Slot Kartı Elementi ---
+                const slotDiv = document.createElement('div');
+                slotDiv.id = slot.id;
+                
+                // Styling ve Clickable kontrolü
+                const isClickable = !isReserved && !limitReached;
+                
+                slotDiv.className = `slot-card p-4 rounded-xl shadow-lg relative flex flex-col justify-between flex-grow 
+                                     ${isReserved ? 'bg-red-900/50 reserved' : 'bg-card-dark'}
+                                     ${isClickable ? 'clickable cursor-pointer' : 'cursor-default'}`;
+                
+                
+                // OnClick handler'ı atama
+                if (isClickable) { 
+                    slotDiv.onclick = () => openReservationModal(slot.id);
+                } else {
+                    slotDiv.onclick = () => {
+                         if (!isAdmin && isReserved) {
+                             // Sadece konsol uyarısı kalır.
+                             console.warn("❗ Bu slot zaten rezerve edilmiş.");
+                         }
+                    };
+                }
+
+
+                let content = '';
+
+                if (isReserved) {
+                    // Rezerve edilmiş kutucuk içeriği
+                    
+                    const safeInstaName = slot.instaName || ''; 
+                    const instaUsername = safeInstaName.replace('@', '');
+                    const instaHandle = safeInstaName.startsWith('@') ? safeInstaName : `@${instaUsername}`;
+                    
+                    content = `
+                        <div class="text-xl font-bold mb-2 text-primary-red">${slot.teamName ? slot.teamName.toUpperCase() : 'Bilinmeyen Takım'}</div>
+                        <div class="text-xs text-gray-400 mb-2 whitespace-pre-wrap break-words">
+                           ${slot.description || 'Açıklama mevcut değil.'}
+                        </div>
+                        <div class="mt-auto pt-2 border-t border-gray-600">
+                            <!-- Instagram Linki Tıklanabilir Yapıldı -->
+                            <a href="https://instagram.com/${instaUsername}" 
+                               target="_blank" 
+                               onclick="event.stopPropagation()" 
+                               class="text-white font-medium hover:underline flex items-center justify-between">
+                                <span class="text-sm">${instaHandle}</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary-red" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </a>
+                        </div>
+                    `;
+                } else {
+                    // Boş kutucuk içeriği
+                    const statusText = limitReached ? 'GÜNLÜK LİMİT DOLDU' : 'TIKLAYARAK REZERVE ET';
+
+                    content = `
+                        <div class="text-2xl font-bold text-gray-300">${slot.name}</div>
+                        <div class="text-sm text-gray-500 mt-2">${statusText}</div>
+                        <div class="mt-auto text-xs pt-2 border-t border-gray-600 ${limitReached ? 'text-yellow-400' : 'text-green-400'}">
+                            ${limitReached ? 'YARIN TEKRAR DENE' : 'BOŞ - Hemen Kap!'}
+                        </div>
+                    `;
+                }
+
+                slotDiv.innerHTML = content;
+                
+                wrapperDiv.appendChild(slotDiv);
+                slotsContainer.appendChild(wrapperDiv); 
+            });
+            
+            // Veritabanı verisi geldiğinde currentSlotsData güncellenir.
+            // Bu sayede bir sonraki render, güncel veriyi kullanır.
+        }
+
+
+        // --- 4. Modal İşlemleri ---
+
+        function openReservationModal(slotId) {
+            
+            const limitReached = isToday(localStorage.getItem(LAST_RESERVED_KEY));
+            
+            if (limitReached) {
+                console.warn("Günlük limit dolduğu için rezervasyon modalı açılamadı.");
+                return;
+            }
+
+            reserveSubmitButton.classList.add('bg-primary-red', 'hover:bg-red-700', 'text-black');
+            reserveSubmitButton.classList.remove('bg-gray-400', 'cursor-not-allowed', 'text-white');
+            reserveSubmitButton.disabled = false;
+            reserveSubmitButton.textContent = 'REZERVE ET';
+
+            selectedSlotId = slotId;
+            modalTitle.textContent = `${slotId.toUpperCase()} REZERVASYON`;
+            form.reset(); 
+            modal.classList.remove('hidden');
+        }
+
+        closeModalButton.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            if (isToday(localStorage.getItem(LAST_RESERVED_KEY))) {
+                console.warn("❗ Üzgünüm, günde sadece 1 kez rezervasyon yapabilirsiniz. İşleminiz iptal edildi.");
+                modal.classList.add('hidden');
+                return;
+            }
+
+            const teamName = document.getElementById('team-name').value.trim();
+            let instaName = document.getElementById('insta-name').value.trim();
+            const description = document.getElementById('description').value.trim();
+
+            if (!teamName || !instaName) {
+                console.warn("Takım Adı ve Instagram Kullanıcı Adı boş bırakılamaz.");
+                return;
+            }
+            
+            const slotIndex = currentSlotsData.findIndex(slot => slot.id === selectedSlotId);
+
+            if (slotIndex !== -1 && slotsRef) {
+                const updatedSlot = {
+                    id: selectedSlotId,
+                    name: currentSlotsData[slotIndex].name, 
+                    teamName: teamName,
+                    instaName: instaName.replace('@', ''), // '@' işaretini temizle
+                    description: description,
+                    isReserved: true,
+                    reservedAt: Date.now(),
+                    reservedByUserId: userId 
+                };
+                
+                const slotToUpdateRef = ref(database, `${SLOTS_DB_PATH}/${selectedSlotId}`);
+
+                set(slotToUpdateRef, updatedSlot)
+                    .then(() => {
+                        localStorage.setItem(LAST_RESERVED_KEY, Date.now());
+                        
+                        console.log("✅ Slotunuz başarıyla rezerve edildi! Şimdi tüm sitede görünecek.");
+                        modal.classList.add('hidden');
+                    })
+                    .catch(error => {
+                        // Hata sadece konsola yazılır.
+                        consoleError(`[RTDB_ERROR] Rezervasyon kaydedilirken bir hata oluştu: ${error.message}\nLütfen Realtime Database güvenlik kurallarını kontrol edin.`);
+                        console.log(`[RTDB_RULES_HINT] Gerekli RTDB kuralı (yazma true olmalı):\n{\n  "rules": {\n    "artifacts": {\n      "$appId": {\n        "public": {\n          "data": {\n            "slots": {\n              ".read": "true",\n              ".write": "true"\n            }\n          }\n        }\n      }\n    }\n  }\n}`);
+                    });
+            } else {
+                console.error("Hata: Seçili slot bulunamadı veya veritabanı hazır değil.");
+            }
+        });
+
+
+    </script>
+</body>
+</html>
